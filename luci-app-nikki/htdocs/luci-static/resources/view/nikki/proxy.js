@@ -26,7 +26,7 @@ return view.extend({
 
         m = new form.Map('nikki');
 
-        s = m.section(form.NamedSection, 'proxy', 'proxy', _('Proxy Config'));
+        s = m.section(form.NamedSection, 'proxy', 'proxy', _('<p><strong>❖ 𝕻𝖗𝖔𝖝𝖞 𝕮𝖔𝖓𝖋𝖎𝖌</strong></p>'));
 
         s.tab('proxy', _('Proxy Config'));
 
