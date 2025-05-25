@@ -17,6 +17,23 @@ function updateStatus(element, running) {
     return element;
 }
 
+/**#1#*/
+function fetchAndUpdateIP() {
+    fetch('https://ipapi.co/json/')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('ip_status').textContent = data.ip || 'N/A';
+            /**document.getElementById('region_status').textContent = data.region || 'N/A';*/
+            document.getElementById('country_status').textContent = data.country_name || 'N/A';
+        })
+        .catch(() => {
+            document.getElementById('ip_status').textContent = 'Failed to load IP';
+            /**document.getElementById('region_status').textContent = 'Failed to load Region';*/
+            document.getElementById('country_status').textContent = 'Failed to load Country';
+        });
+}
+/**#1#*/
+
 return view.extend({
     load: function () {
         return Promise.all([
@@ -35,11 +52,26 @@ return view.extend({
 
         let m, s, o;
 
-        m = new form.Map('nikki', _('Nikki'), `${_('Transparent Proxy with Mihomo on OpenWrt.')} <a href="https://github.com/nikkinikki-org/OpenWrt-nikki/wiki" target="_blank">${_('How To Use')}</a>`);
+        m = new form.Map('nikki');
 
-        s = m.section(form.TableSection, 'status', _('Status'));
+        s = m.section(form.TableSection, 'status', _('<p><strong>❖ 𝔖𝔱𝔞𝔱𝔲𝔰</strong></p>'));
         s.anonymous = true;
+/**#4#*/        
+        o = s.option(form.DummyValue, '_ip_status', _('IP Address'));
+        o.cfgvalue = () => E('div', { id: 'ip_status', style: 'font-weight: bold; color: red;' }, 'Loading IP...');
+/**
+        o = s.option(form.DummyValue, '_region_status', _('Region'));
+        o.cfgvalue = () => E('div', { id: 'region_status', style: 'font-weight: bold; color: blue;' }, 'Loading Region...');
+*/
+        o = s.option(form.DummyValue, '_country_status', _('Country'));
+        o.cfgvalue = () => E('div', { id: 'country_status', style: 'font-weight: bold; color: green;' }, 'Loading Country...');
 
+        // Call fetchAndUpdateIP immediately and set an interval to update every 30 seconds
+        fetchAndUpdateIP();
+        setInterval(fetchAndUpdateIP, 30000); // 30 seconds interval
+
+/**        setTimeout(fetchAndUpdateIP, 500);*/
+/**#4#*/    
         o = s.option(form.Value, '_app_version', _('App Version'));
         o.readonly = true;
         o.load = function () {
@@ -91,7 +123,7 @@ return view.extend({
             return nikki.openDashboard();
         };
 
-        s = m.section(form.NamedSection, 'config', 'config', _('App Config'));
+        s = m.section(form.NamedSection, 'config', 'config', _('<p><strong>❖ 𝔄𝔭𝔭 ℭ𝔬𝔫𝔣𝔦𝔤</strong></p>'));
 
         o = s.option(form.Flag, 'enabled', _('Enable'));
         o.rmempty = false;
@@ -125,7 +157,7 @@ return view.extend({
         o = s.option(form.Flag, 'fast_reload', _('Fast Reload'));
         o.rmempty = false;
 
-        s = m.section(form.NamedSection, 'env', 'env', _('Core Environment Variable Config'));
+        s = m.section(form.NamedSection, 'env', 'env', _('<p><strong>❖ ℭ𝔬𝔯𝔢 ℭ𝔬𝔫𝔣𝔦𝔤</strong></p>'));
 
         o = s.option(form.Flag, 'disable_safe_path_check', _('Disable Safe Path Check'));
         o.rmempty = false;
