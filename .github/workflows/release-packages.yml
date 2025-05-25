@@ -18,10 +18,6 @@ jobs:
           - aarch64_generic
         branch:
           - openwrt-23.05
-          - openwrt-24.10
-        exclude:
-          - arch: aarch64_cortex-a76
-            branch: openwrt-23.05
 
     steps:
       - name: checkout
