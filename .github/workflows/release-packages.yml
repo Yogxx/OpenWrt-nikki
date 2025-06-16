@@ -10,7 +10,7 @@ jobs:
   release:
     name: ${{ matrix.arch }}-${{ matrix.branch }} release
     runs-on: ubuntu-latest
-    continue-on-error: false
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -20,15 +20,18 @@ jobs:
         branch:
           - openwrt-23.05
           - openwrt-24.10
+        exclude:
+          - arch: aarch64_cortex-a76
+            branch: openwrt-23.05
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up OpenWrt SDK
+      - name: Setup OpenWrt SDK
         uses: openwrt/gh-action-sdk@main
         env:
-          ARCH: ${{ matrix.arch }}
+          ARCH: ${{ matrix.arch }}-${{ matrix.branch }}
           FEEDNAME: nikki
           PACKAGES: luci-app-nikki
           INDEX: 1
@@ -36,11 +39,10 @@ jobs:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           NO_REFRESH_CHECK: true
 
-      - name: Generate .config
-        run: make defconfig
-
-      - name: Build packages
-        run: make package/index V=s
+      - name: Build package
+        run: |
+          make package/luci-app-nikki/compile V=s
+          make package/index
 
       - name: Compress built packages
         run: |
@@ -49,8 +51,8 @@ jobs:
           mv bin/packages/${{ matrix.arch }}/nikki public/${{ matrix.branch }}/${{ matrix.arch }}
           tar -czf feed_nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz public/${{ matrix.branch }}/${{ matrix.arch }}
 
-      - name: Create GitHub Release (if tag push)
-        if: github.event_name == 'push' && startsWith(github.ref_name, 'v')
+      - if: github.event_name == 'push' && startsWith(github.ref_name, 'v')
+        name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz
@@ -63,11 +65,11 @@ jobs:
 
   feed:
     needs: release
-    name: Feed deployment
+    name: feed
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download built feed
+      - name: Download feed artifact
         uses: actions/download-artifact@v4
         with:
           pattern: feed_nikki_*
@@ -79,15 +81,14 @@ jobs:
             tar -xzf "$file"
           done
 
-      - name: Prepare feed for Pages
+      - name: Prepare feed directory
         run: |
-          mkdir -p public
           echo "${{ secrets.KEY_BUILD_PUB }}" > public/key-build.pub
           echo "${{ secrets.PUBLIC_KEY }}" > public/public-key.pem
           tree --dirsfirst --sort name -P '*.apk|*.ipk' --prune --noreport -H "" -T "Nikki's Feed" --charset utf-8 -o public/index.html public
           sed -i '/<p class="VERSION">/,/<\/p>/d' public/index.html
 
-      - name: Deploy feed to Cloudflare Pages
+      - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
