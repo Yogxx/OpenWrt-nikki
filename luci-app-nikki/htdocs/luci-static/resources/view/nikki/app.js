@@ -35,7 +35,7 @@ return view.extend({
 
         let m, s, o;
 
-        m = new form.Map('nikki', _('<p><strong><span style="color: rgb(255, 0, 150);">❖ NIKKI</span> <span style="color: rgb(0, 150, 255);">NIKKI ❖</span></strong></p>'),);
+        m = new form.Map('nikki', _('Nikki'), `${_('Transparent Proxy with Mihomo on OpenWrt.')} <a href="https://github.com/nikkinikki-org/OpenWrt-nikki/wiki" target="_blank">${_('How To Use')}</a>`);
 
         s = m.section(form.TableSection, 'status', _('Status'));
         s.anonymous = true;
@@ -130,8 +130,13 @@ return view.extend({
 
         s = m.section(form.NamedSection, 'env', 'env', _('Core Environment Variable Config'));
 
-        o = s.option(form.Flag, 'disable_safe_path_check', _('Disable Safe Path Check'));
-        o.rmempty = false;
+        o = s.option(form.DynamicList, 'safe_paths', _('Safe Paths'));
+        o.load = function (section_id) {
+            return this.super('load', section_id)?.split(':');
+        };
+        o.write = function (section_id, formvalue) {
+            this.super('write', section_id, formvalue?.join(':'));
+        };
 
         o = s.option(form.Flag, 'disable_loopback_detector', _('Disable Loopback Detector'));
         o.rmempty = false;
@@ -140,6 +145,9 @@ return view.extend({
         o.rmempty = false;
 
         o = s.option(form.Flag, 'disable_quic_go_ecn', _('Disable ECN of quic-go'));
+        o.rmempty = false;
+
+        o = s.option(form.Flag, 'skip_system_ipv6_check', _('Skip System IPv6 Check'));
         o.rmempty = false;
 
         return m.render();
