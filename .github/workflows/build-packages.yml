@@ -12,8 +12,10 @@ jobs:
       matrix:
         arch:
           - aarch64_generic
+          - x86_64
         branch:
           - openwrt-24.10
+          - openwrt-23.05
         exclude:
           - arch: aarch64_cortex-a76
             branch: openwrt-23.05
