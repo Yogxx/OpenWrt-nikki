@@ -35,9 +35,12 @@ jobs:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           NO_REFRESH_CHECK: true
 
+      - name: Symlink luci-app-nikki into package/
+        run: ln -s $(pwd)/luci-app-nikki package/luci-app-nikki
+
       - name: Build package
         run: |
-          make package/feeds/luci-app-nikki/compile V=s
+          make package/luci-app-nikki/compile V=s
           make package/index
 
       - name: Compress built packages
@@ -93,3 +96,4 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           command: pages deploy public --project-name=nikkinikki
+          
