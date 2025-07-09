@@ -20,9 +20,6 @@ jobs:
         branch:
           - openwrt-23.05
           - openwrt-24.10
-        exclude:
-          - arch: aarch64_cortex-a76
-            branch: openwrt-23.05
 
     steps:
       - name: Checkout repository
@@ -34,7 +31,6 @@ jobs:
           ARCH: ${{ matrix.arch }}-${{ matrix.branch }}
           FEEDNAME: nikki
           PACKAGES: luci-app-nikki
-          INDEX: 1
           KEY_BUILD: ${{ secrets.KEY_BUILD }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           NO_REFRESH_CHECK: true
@@ -75,6 +71,9 @@ jobs:
           pattern: feed_nikki_*
           merge-multiple: true
 
+      - name: Install tree utility
+        run: sudo apt-get update && sudo apt-get install -y tree
+
       - name: Uncompress feeds
         run: |
           for file in feed_nikki_*.tar.gz; do
@@ -94,4 +93,3 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           command: pages deploy public --project-name=nikkinikki
-          
