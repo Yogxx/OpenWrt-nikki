@@ -36,7 +36,9 @@ jobs:
           NO_REFRESH_CHECK: true
 
       - name: Symlink luci-app-nikki into package/
-        run: ln -s $(pwd)/luci-app-nikki package/luci-app-nikki
+        run: |
+          mkdir -p package
+          ln -s $(pwd)/luci-app-nikki package/luci-app-nikki
 
       - name: Build package
         run: |
