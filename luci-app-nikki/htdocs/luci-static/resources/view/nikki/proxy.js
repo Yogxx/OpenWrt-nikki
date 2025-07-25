@@ -99,9 +99,13 @@ return view.extend({
         so = o.subsection.option(form.Flag, 'proxy', _('Proxy'));
         so.rmempty = false;
 
+        so = o.subsection.option(form.Flag, 'dns', _('DNS'));
+        so.rmempty = false;
+
         s.tab('lan', _('LAN Proxy'));
 
         o = s.taboption('lan', form.Flag, 'lan_proxy', _('Enable'));
+        o.rmempty = false;
 
         o = s.taboption('lan', form.DynamicList, 'lan_inbound_interface', _('Inbound Interface'));
         o.retain = true;
