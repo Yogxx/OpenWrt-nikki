@@ -18,7 +18,7 @@
         }
     },
     "admin/services/nikki/advancededitor": {
-        "title": "ADVANCED EDITOR",
+        "title": "EDITOR",
         "order": 15,
         "action": {
             "type": "view",
