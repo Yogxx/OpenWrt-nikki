@@ -35,7 +35,7 @@ return view.extend({
 
         let m, s, o;
 
-        m = new form.Map('nikki', _('<p><strong><span style="color: rgb(255, 0, 150);">❖ NIKKI</span> <span style="color: rgb(0, 150, 255);">NIKKI ❖</span></strong></p>'), );
+        m = new form.Map('nikki');
 
         s = m.section(form.TableSection, 'status', _('Status'));
         s.anonymous = true;
