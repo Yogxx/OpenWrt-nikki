@@ -1,1 +1,21 @@
+<%+header%>
+<h2>Backup & Restore Nikki</h2>
 
+<h3>Download Backup</h3>
+<p>
+  <% 
+    local date = os.date("%Y-%m-%d")
+  %>
+  <a class="btn cbi-button cbi-button-action" href="/cgi-bin/nikki-backup.sh">
+    Download Backup (nikki-backup-<%=date%>.tar.gz)
+  </a>
+</p>
+
+<h3>Upload & Restore Backup</h3>
+<p>Pilih file backup (.tar.gz) dan klik tombol Restore:</p>
+<form class="cbi-section" method="post" enctype="multipart/form-data" action="/cgi-bin/luci/admin/services/nikki/restore">
+    <input type="file" name="backup_file" required />
+    <input class="btn cbi-button cbi-button-save" type="submit" value="Upload & Restore" />
+</form>
+<%+footer%>
+  
