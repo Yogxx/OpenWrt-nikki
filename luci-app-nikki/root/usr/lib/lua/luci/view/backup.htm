@@ -1,0 +1,26 @@
+<%+header%>
+<!--<h3>Nikki Backup & Restore</h3>-->
+
+<% 
+ local status = luci.http.formvalue("status")
+ if status == "restore_ok" then 
+%>
+  <div class="alert-message success">✅ Restore berhasil dilakukan.</div>
+<% end %>
+
+<div class="cbi-section">
+    <h3>Backup</h3>
+    <form method="post" action="<%=url('admin/services/nikki/do_backup')%>">
+        <input type="submit" class="btn cbi-button cbi-button-apply" value="Download Backup (.tar.gz)" />
+    </form>
+</div>
+
+<div class="cbi-section">
+    <h3>Restore</h3>
+    <form method="post" enctype="multipart/form-data" action="<%=url('admin/services/nikki/do_restore')%>">
+        <input type="file" name="upload" required />
+        <input type="submit" class="btn cbi-button cbi-button-apply" value="Upload & Restore" />
+    </form>
+</div>
+
+<%+footer%>
