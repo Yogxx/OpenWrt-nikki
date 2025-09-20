@@ -10,7 +10,7 @@
         }
     },
     "admin/services/nikki/config": {
-        "title": "App Config",
+        "title": "Config",
         "order": 10,
         "action": {
             "type": "view",
@@ -26,7 +26,7 @@
         }
     },
     "admin/services/nikki/mixin": {
-        "title": "Mixin Config",
+        "title": "Mixin",
         "order": 30,
         "action": {
             "type": "view",
@@ -34,7 +34,7 @@
         }
     },
     "admin/services/nikki/proxy": {
-        "title": "Proxy Config",
+        "title": "Proxy",
         "order": 40,
         "action": {
             "type": "view",
