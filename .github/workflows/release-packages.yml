@@ -1,29 +1,43 @@
-name: release-packages
+name: build
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - v*
 
 jobs:
   release:
-    name: ${{ matrix.arch }}-${{ matrix.branch }} release
-    runs-on: ubuntu-latest
-    continue-on-error: true
     strategy:
-      fail-fast: false
       matrix:
-        arch:
-          - aarch64_generic
-          - x86_64
-        branch:
-          - openwrt-23.05
-          - openwrt-24.10
+        include:
+          - arch: x86_64
+            branch: openwrt-23.05
+          - arch: aarch64_generic
+            branch: openwrt-23.05
+          - arch: arm_cortex-a7
+            branch: openwrt-23.05
+          - arch: arm_cortex-a9
+            branch: openwrt-23.05
+          - arch: mipsel_24kc
+            branch: openwrt-23.05
+          - arch: mips_24kc
+            branch: openwrt-23.05
+          - arch: x86_64
+            branch: openwrt-24.10
+          - arch: aarch64_generic
+            branch: openwrt-24.10
+          - arch: arm_cortex-a7
+            branch: openwrt-24.10
+          - arch: arm_cortex-a9
+            branch: openwrt-24.10
+          - arch: mipsel_24kc
+            branch: openwrt-24.10
+          - arch: mips_24kc
+            branch: openwrt-24.10
+
+    name: build (${{ matrix.arch }}-${{ matrix.branch }})
+    runs-on: ubuntu-latest
 
     steps:
-      - name: checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@main
 
       - name: build
         uses: openwrt/gh-action-sdk@main
@@ -35,26 +49,13 @@ jobs:
           KEY_BUILD: ${{ secrets.KEY_BUILD }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           NO_REFRESH_CHECK: true
-
-      - name: compress
-        run: |
-          tar -czf nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz -C bin/packages/${{ matrix.arch }}/nikki .
-          mkdir -p public/${{ matrix.branch }}/${{ matrix.arch }}
-          mv bin/packages/${{ matrix.arch }}/nikki public/${{ matrix.branch }}/${{ matrix.arch }}
-          tar -czf feed_nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz public/${{ matrix.branch }}/${{ matrix.arch }}
-
-      - name: release
-        if: github.event_name == 'push' && startsWith(github.ref_name, 'v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz
+          V: "s"   # log detail seperti make V=s
 
       - name: upload
         uses: actions/upload-artifact@v4
         with:
           name: feed_nikki_${{ matrix.arch }}-${{ matrix.branch }}
-          path: feed_nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz
+          path: bin/packages/*/nikki/*
 
   feed:
     needs: release
@@ -71,14 +72,14 @@ jobs:
       - name: debug
         run: |
           echo "=== List file setelah download ==="
-          ls -R
+          ls -lh
 
       - name: uncompress
         run: |
           shopt -s nullglob
-          files=(feed_nikki_*.tar.gz)
+          files=(*.tar.gz)
           if [ ${#files[@]} -eq 0 ]; then
-            echo "❌ Tidak ada file feed_nikki_*.tar.gz ditemukan"
+            echo "❌ Tidak ada file .tar.gz ditemukan"
             exit 1
           fi
 
@@ -92,7 +93,9 @@ jobs:
           sudo apt-get update && sudo apt-get install -y tree
           echo "${{ secrets.KEY_BUILD_PUB }}" > public/key-build.pub
           echo "${{ secrets.PUBLIC_KEY }}" > public/public-key.pem
-          tree --dirsfirst --sort name -P '*.apk|*.ipk' --prune --noreport -H "" -T "Nikki's Feed" --charset utf-8 -o public/index.html public
+          tree --dirsfirst --sort name -P '*.apk|*.ipk' --prune --noreport \
+               -H "" -T "Nikki's Feed" --charset utf-8 \
+               -o public/index.html public
           sed -i '/<p class="VERSION">/,/<\/p>/d' public/index.html
 
       - name: feed
