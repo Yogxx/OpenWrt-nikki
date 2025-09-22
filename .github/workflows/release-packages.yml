@@ -1,43 +1,34 @@
-name: build
+name: release-packages
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - v*
 
 jobs:
   release:
-    strategy:
-      matrix:
-        include:
-          - arch: x86_64
-            branch: openwrt-23.05
-          - arch: aarch64_generic
-            branch: openwrt-23.05
-          - arch: arm_cortex-a7
-            branch: openwrt-23.05
-          - arch: arm_cortex-a9
-            branch: openwrt-23.05
-          - arch: mipsel_24kc
-            branch: openwrt-23.05
-          - arch: mips_24kc
-            branch: openwrt-23.05
-          - arch: x86_64
-            branch: openwrt-24.10
-          - arch: aarch64_generic
-            branch: openwrt-24.10
-          - arch: arm_cortex-a7
-            branch: openwrt-24.10
-          - arch: arm_cortex-a9
-            branch: openwrt-24.10
-          - arch: mipsel_24kc
-            branch: openwrt-24.10
-          - arch: mips_24kc
-            branch: openwrt-24.10
-
-    name: build (${{ matrix.arch }}-${{ matrix.branch }})
+    name: ${{ matrix.arch }}-${{ matrix.branch }} release
     runs-on: ubuntu-latest
-
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - aarch64_generic
+          - x86_64
+        branch:
+          - openwrt-23.05
+          - openwrt-24.10
+          - SNAPSHOT
+        exclude:
+          - arch: aarch64_generic
+            branch: openwrt-23.05
+          - arch: x86_64
+            branch: SNAPSHOT
     steps:
-      - uses: actions/checkout@main
+      - name: checkout
+        uses: actions/checkout@v4
 
       - name: build
         uses: openwrt/gh-action-sdk@main
@@ -49,13 +40,26 @@ jobs:
           KEY_BUILD: ${{ secrets.KEY_BUILD }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           NO_REFRESH_CHECK: true
-          V: "s"   # log detail seperti make V=s
+
+      - name: compress
+        run: |
+          tar -c -z -f nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz -C bin/packages/${{ matrix.arch }}/nikki .
+          mkdir -p public/${{ matrix.branch }}/${{ matrix.arch }}
+          mv bin/packages/${{ matrix.arch }}/nikki public/${{ matrix.branch }}/${{ matrix.arch }}
+          tar -c -z -f feed_nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz public/${{ matrix.branch }}/${{ matrix.arch }}
+
+      - if: github.event_name == 'push' && startsWith(github.ref_name, 'v')
+        name: release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz
 
       - name: upload
         uses: actions/upload-artifact@v4
         with:
           name: feed_nikki_${{ matrix.arch }}-${{ matrix.branch }}
-          path: bin/packages/*/nikki/*
+          path: feed_nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz
 
   feed:
     needs: release
@@ -68,39 +72,21 @@ jobs:
         with:
           pattern: feed_nikki_*
           merge-multiple: true
-
-      - name: debug
-        run: |
-          echo "=== List file setelah download ==="
-          ls -lh
-
+      
       - name: uncompress
         run: |
-          shopt -s nullglob
-          files=(*.tar.gz)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "❌ Tidak ada file .tar.gz ditemukan"
-            exit 1
-          fi
-
-          for file in "${files[@]}"; do
-            echo "📦 Extracting $file ..."
-            tar -xzf "$file"
-          done
-
+          for file in feed_nikki_*.tar.gz; do tar -x -z -f "$file"; done
+      
       - name: prepare
         run: |
-          sudo apt-get update && sudo apt-get install -y tree
           echo "${{ secrets.KEY_BUILD_PUB }}" > public/key-build.pub
           echo "${{ secrets.PUBLIC_KEY }}" > public/public-key.pem
-          tree --dirsfirst --sort name -P '*.apk|*.ipk' --prune --noreport \
-               -H "" -T "Nikki's Feed" --charset utf-8 \
-               -o public/index.html public
+          tree --dirsfirst --sort name -P '*.apk|*.ipk' --prune --noreport -H "" -T "Nikki's Feed" --charset utf-8 -o public/index.html public
           sed -i '/<p class="VERSION">/,/<\/p>/d' public/index.html
 
       - name: feed
         uses: cloudflare/wrangler-action@v3
         with:
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: pages deploy ./public --project-name=nikkinikki
-          
+          command: pages deploy public --project-name=nikkinikki
