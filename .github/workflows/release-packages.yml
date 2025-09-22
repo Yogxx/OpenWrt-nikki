@@ -20,11 +20,6 @@ jobs:
         branch:
           - openwrt-23.05
           - openwrt-24.10
-        exclude:
-          - arch: aarch64_cortex-a76
-            branch: openwrt-23.05
-          - arch: mips_4kec
-            branch: SNAPSHOT
 
     steps:
       - name: checkout
@@ -43,13 +38,13 @@ jobs:
 
       - name: compress
         run: |
-          tar -c -z -f nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz -C bin/packages/${{ matrix.arch }}/nikki .
+          tar -czf nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz -C bin/packages/${{ matrix.arch }}/nikki .
           mkdir -p public/${{ matrix.branch }}/${{ matrix.arch }}
           mv bin/packages/${{ matrix.arch }}/nikki public/${{ matrix.branch }}/${{ matrix.arch }}
-          tar -c -z -f feed_nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz public/${{ matrix.branch }}/${{ matrix.arch }}
+          tar -czf feed_nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz public/${{ matrix.branch }}/${{ matrix.arch }}
 
-      - if: github.event_name == 'push' && startsWith(github.ref_name, 'v')
-        name: release
+      - name: release
+        if: github.event_name == 'push' && startsWith(github.ref_name, 'v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -72,13 +67,29 @@ jobs:
         with:
           pattern: feed_nikki_*
           merge-multiple: true
-      
+
+      - name: debug
+        run: |
+          echo "=== List file setelah download ==="
+          ls -R
+
       - name: uncompress
         run: |
-          for file in feed_nikki_*.tar.gz; do tar -x -z -f "$file"; done
-      
+          shopt -s nullglob
+          files=(feed_nikki_*.tar.gz)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "❌ Tidak ada file feed_nikki_*.tar.gz ditemukan"
+            exit 1
+          fi
+
+          for file in "${files[@]}"; do
+            echo "📦 Extracting $file ..."
+            tar -xzf "$file"
+          done
+
       - name: prepare
         run: |
+          sudo apt-get update && sudo apt-get install -y tree
           echo "${{ secrets.KEY_BUILD_PUB }}" > public/key-build.pub
           echo "${{ secrets.PUBLIC_KEY }}" > public/public-key.pem
           tree --dirsfirst --sort name -P '*.apk|*.ipk' --prune --noreport -H "" -T "Nikki's Feed" --charset utf-8 -o public/index.html public
@@ -87,6 +98,6 @@ jobs:
       - name: feed
         uses: cloudflare/wrangler-action@v3
         with:
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: pages deploy public --project-name=nikkinikki
+          command: pages deploy ./public --project-name=nikkinikki
+          
