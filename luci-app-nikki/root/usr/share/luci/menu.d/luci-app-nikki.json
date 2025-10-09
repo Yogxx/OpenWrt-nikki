@@ -10,19 +10,19 @@
         }
     },
     "admin/services/nikki/config": {
-        "title": "Config",
+        "title": "Status",
         "order": 10,
         "action": {
             "type": "view",
             "path": "nikki/app"
         }
     },
-    "admin/services/nikki/profile": {
-        "title": "Profile",
+    "admin/services/nikki/configeditor": {
+        "title": "Config Editor",
         "order": 20,
         "action": {
             "type": "view",
-            "path": "nikki/profile"
+            "path": "nikki/configeditor"
         }
     },
     "admin/services/nikki/mixin": {
