@@ -19,6 +19,11 @@ jobs:
           - x86_64
         branch:
           - openwrt-24.10
+        exclude:
+          - arch: aarch64_cortex-a76
+            branch: openwrt-23.05
+          - arch: mips_4kec
+            branch: SNAPSHOT
 
     steps:
       - name: checkout
