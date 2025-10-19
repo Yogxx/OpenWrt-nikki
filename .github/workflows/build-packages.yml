@@ -34,21 +34,36 @@ jobs:
           PACKAGES: luci-app-nikki
           NO_REFRESH_CHECK: true
 
+      - name: Create ZIP from all built packages
+        run: |
+          mkdir -p output
+          ZIP_NAME="nikki_${{ matrix.arch }}-${{ matrix.branch }}.zip"
+          PACKAGE_DIR="bin/packages/${{ matrix.arch }}/nikki"
+          if [ -d "$PACKAGE_DIR" ]; then
+            cd "$PACKAGE_DIR"
+            zip -r "../../../../output/$ZIP_NAME" ./*
+            cd -
+          else
+            echo "No package directory found at $PACKAGE_DIR"
+          fi
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: nikki_${{ matrix.arch }}-${{ matrix.branch }}
-          path: bin/packages/${{ matrix.arch }}/nikki
+          path: output/*.zip
 
-      # === Kirim semua file .ipk ke Telegram ===
-      - name: Send all .ipk files to Telegram
+      # === Kirim hasil ZIP ke Telegram ===
+      - name: Send ZIP to Telegram
         if: success()
         run: |
-          for f in $(find bin/packages/${{ matrix.arch }}/nikki -type f -name '*.ipk'); do
+          ZIP_FILE=$(find output -type f -name "*.zip" | head -n 1)
+          if [ -n "$ZIP_FILE" ]; then
             curl -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-                 -F document=@$f \
-                 -F caption="✅ Build: ${{ matrix.arch }} - ${{ matrix.branch }} ($(basename $f))" \
+                 -F document=@$ZIP_FILE \
+                 -F caption="✅ Build selesai: ${{ matrix.arch }} - ${{ matrix.branch }}" \
                  https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument
-            sleep 2
-          done
+          else
+            echo "No ZIP file found to send."
+          fi
           
