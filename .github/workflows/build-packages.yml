@@ -23,10 +23,10 @@ jobs:
             branch: SNAPSHOT
 
     steps:
-      - name: checkout
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: build
+      - name: Build
         uses: openwrt/gh-action-sdk@main
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.branch }}
@@ -34,23 +34,21 @@ jobs:
           PACKAGES: luci-app-nikki
           NO_REFRESH_CHECK: true
 
-      - name: upload
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: nikki_${{ matrix.arch }}-${{ matrix.branch }}
           path: bin/packages/${{ matrix.arch }}/nikki
 
-      # === Kirim hasil build ke Telegram ===
-      - name: Send to Telegram
+      # === Kirim semua file .ipk ke Telegram ===
+      - name: Send all .ipk files to Telegram
         if: success()
         run: |
-          FILE_PATH=$(find bin/packages/${{ matrix.arch }}/nikki -type f -name '*.ipk' | head -n 1)
-          if [ -n "$FILE_PATH" ]; then
+          for f in $(find bin/packages/${{ matrix.arch }}/nikki -type f -name '*.ipk'); do
             curl -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-                 -F document=@$FILE_PATH \
-                 -F caption="✅ Build selesai: ${{ matrix.arch }} - ${{ matrix.branch }}" \
+                 -F document=@$f \
+                 -F caption="✅ Build: ${{ matrix.arch }} - ${{ matrix.branch }} ($(basename $f))" \
                  https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument
-          else
-            echo "No .ipk file found to send."
-          fi
+            sleep 2
+          done
           
