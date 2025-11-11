@@ -1,4 +1,4 @@
-name: nikkitest
+name: nikki builder
 
 on:
   workflow_dispatch:
@@ -48,7 +48,6 @@ jobs:
             echo "No package directory found at $PACKAGE_DIR"
           fi
 
-      # ✅ === Upload ke Telegram ===
       - name: Send ZIP to Telegram
         if: success()
         run: |
@@ -68,7 +67,6 @@ jobs:
           name: nikki_${{ matrix.arch }}-${{ matrix.branch }}
           path: output/*.zip
 
-  # ✅ === RELEASE JOB ===
   release:
     name: Upload to Release
     needs: build
@@ -95,7 +93,7 @@ jobs:
           tag_name: "v${{ steps.version.outputs.VERSION }}"
           name: "Nikki v${{ steps.version.outputs.VERSION }}"
           body: |
-            Rilis otomatis berdasarkan versi dari Makefile.
+            Nikki Mod Releases.
             Versi: ${{ steps.version.outputs.VERSION }}
           files: output/**/*.zip
         env:
