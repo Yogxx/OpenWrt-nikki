@@ -1,39 +1,46 @@
-name: Build-Nikki
+name: build-nikki
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build for ${{ matrix.arch }} ${{ matrix.branch }}
+    name: ${{ matrix.arch }}-${{ matrix.branch }} build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64, mipsel, arm]
+        arch: [aarch64_generic, x86_64]
         branch: [openwrt-23.05, openwrt-24.10]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup folders
-        run: mkdir -p output
-
-      - name: Read version from Makefile
-        id: getver
+      - name: Ambil versi dari Makefile
+        id: version
         run: |
-          VERSION=$(grep -Po '(?<=PKG_VERSION:=).*' luci-app-nikki/Makefile)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          VER=$(grep -Po '(?<=PKG_VERSION:=).*' luci-app-nikki/Makefile)
+          echo "VERSION=$VER" >> $GITHUB_OUTPUT
+
+      - name: Build
+        uses: openwrt/gh-action-sdk@main
+        env:
+          ARCH: ${{ matrix.arch }}-${{ matrix.branch }}
+          FEEDNAME: nikki
+          PACKAGES: luci-app-nikki
+          NO_REFRESH_CHECK: true
 
       - name: Create ZIP
         run: |
-          zip -r output/nikki_${{ matrix.arch }}-${{ matrix.branch }}_${{ steps.getver.outputs.version }}.zip luci-app-nikki
-
-      - name: Upload ZIP to Telegram
-        run: |
-          curl -F document=@output/nikki_${{ matrix.arch }}-${{ matrix.branch }}_${{ steps.getver.outputs.version }}.zip \
-               "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument?chat_id=${{ secrets.CHAT_ID }}"
+          mkdir -p output
+          ZIP_NAME="nikki_${{ matrix.arch }}-${{ matrix.branch }}_${{ steps.version.outputs.VERSION }}.zip"
+          PACKAGE_DIR="bin/packages/${{ matrix.arch }}/nikki"
+          if [ -d "$PACKAGE_DIR" ]; then
+            cd "$PACKAGE_DIR"
+            zip -r "../../../../output/$ZIP_NAME" ./*
+            cd -
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -42,7 +49,7 @@ jobs:
           path: output/*.zip
 
   release:
-    name: Create unified Release
+    name: Upload to Release
     needs: build
     runs-on: ubuntu-latest
 
@@ -50,28 +57,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Ambil versi dari Makefile
+        id: version
+        run: |
+          VER=$(grep -Po '(?<=PKG_VERSION:=).*' luci-app-nikki/Makefile)
+          echo "VERSION=$VER" >> $GITHUB_OUTPUT
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: all_zips
-
-      - name: Extract version
-        id: getver
-        run: |
-          VERSION=$(grep -Po '(?<=PKG_VERSION:=).*' luci-app-nikki/Makefile)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          path: output
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "nikki-${{ steps.getver.outputs.version }}"
-          name: "Nikki Release v${{ steps.getver.outputs.version }}"
-          body: |
-            Rilis otomatis berdasarkan versi Makefile.
-            Versi: ${{ steps.getver.outputs.version }}
-
-            Build mencakup semua arsitektur dan branch.
-          files: all_zips/**/*.zip
+          tag_name: "v${{ steps.version.outputs.VERSION }}"
+          name: "Nikki v${{ steps.version.outputs.VERSION }}"
+          files: output/**/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
