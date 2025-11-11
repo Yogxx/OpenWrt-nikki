@@ -1,73 +1,45 @@
-name: build-nikki
+name: Build-Nikki
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    name: ${{ matrix.arch }}-${{ matrix.branch }} build
+    name: Build for ${{ matrix.arch }} ${{ matrix.branch }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        arch:
-          - aarch64_generic
-          - x86_64
-        branch:
-          - openwrt-23.05
-          - openwrt-24.10
+        arch: [x86_64, aarch64, mipsel, arm]
+        branch: [openwrt-23.05, openwrt-24.10]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract version from Makefile
+      - name: Setup folders
+        run: mkdir -p output
+
+      - name: Read version from Makefile
         id: getver
         run: |
           VERSION=$(grep -Po '(?<=PKG_VERSION:=).*' luci-app-nikki/Makefile)
-          RELEASE=$(grep -Po '(?<=PKG_RELEASE:=).*' luci-app-nikki/Makefile || echo "")
-          if [ -n "$RELEASE" ]; then
-            FULLVER="${VERSION}-${RELEASE}"
-          else
-            FULLVER="${VERSION}"
-          fi
-          echo "version=$FULLVER" >> $GITHUB_OUTPUT
-
-      - name: Build
-        uses: openwrt/gh-action-sdk@main
-        env:
-          ARCH: ${{ matrix.arch }}-${{ matrix.branch }}
-          FEEDNAME: nikki
-          PACKAGES: luci-app-nikki
-          NO_REFRESH_CHECK: true
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Create ZIP
         run: |
-          mkdir -p output
-          ZIP_NAME="nikki_${{ matrix.arch }}-${{ matrix.branch }}.zip"
-          PACKAGE_DIR="bin/packages/${{ matrix.arch }}/nikki"
-          if [ -d "$PACKAGE_DIR" ]; then
-            cd "$PACKAGE_DIR"
-            zip -r "../../../../output/$ZIP_NAME" ./*
-            cd -
-          fi
+          zip -r output/nikki_${{ matrix.arch }}-${{ matrix.branch }}_${{ steps.getver.outputs.version }}.zip luci-app-nikki
+
+      - name: Upload ZIP to Telegram
+        run: |
+          curl -F document=@output/nikki_${{ matrix.arch }}-${{ matrix.branch }}_${{ steps.getver.outputs.version }}.zip \
+               "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument?chat_id=${{ secrets.CHAT_ID }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nikki-${{ matrix.arch }}-${{ matrix.branch }}
+          name: nikki_${{ matrix.arch }}-${{ matrix.branch }}
           path: output/*.zip
-
-      - name: Send ZIP to Telegram
-        if: success()
-        run: |
-          ZIP_FILE="output/nikki_${{ matrix.arch }}-${{ matrix.branch }}.zip"
-          if [ -f "$ZIP_FILE" ]; then
-            curl -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-                 -F document=@$ZIP_FILE \
-                 -F caption="✅ Build selesai: ${{ matrix.arch }} - ${{ matrix.branch }}" \
-                 https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument
-          fi
 
   release:
     name: Create unified Release
@@ -75,22 +47,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: all_zips
 
-      - name: Extract version again
+      - name: Extract version
         id: getver
         run: |
           VERSION=$(grep -Po '(?<=PKG_VERSION:=).*' luci-app-nikki/Makefile)
-          RELEASE=$(grep -Po '(?<=PKG_RELEASE:=).*' luci-app-nikki/Makefile || echo "")
-          if [ -n "$RELEASE" ]; then
-            FULLVER="${VERSION}-${RELEASE}"
-          else
-            FULLVER="${VERSION}"
-          fi
-          echo "version=$FULLVER" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
@@ -98,8 +67,10 @@ jobs:
           tag_name: "nikki-${{ steps.getver.outputs.version }}"
           name: "Nikki Release v${{ steps.getver.outputs.version }}"
           body: |
-            Rilis otomatis berdasarkan versi Makefile:
-            • Versi: ${{ steps.getver.outputs.version }}
+            Rilis otomatis berdasarkan versi Makefile.
+            Versi: ${{ steps.getver.outputs.version }}
+
+            Build mencakup semua arsitektur dan branch.
           files: all_zips/**/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
