@@ -1,0 +1,82 @@
+name: build-packages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.arch }}-${{ matrix.branch }} build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - aarch64_generic
+          - x86_64
+        branch:
+          - openwrt-23.05
+          - openwrt-24.10
+        exclude:
+          - arch: aarch64_cortex-a76
+            branch: openwrt-23.05
+          - arch: mips_4kec
+            branch: SNAPSHOT
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        uses: openwrt/gh-action-sdk@main
+        env:
+          ARCH: ${{ matrix.arch }}-${{ matrix.branch }}
+          FEEDNAME: nikki
+          PACKAGES: luci-app-nikki
+          NO_REFRESH_CHECK: true
+
+      - name: Create ZIP from all built packages
+        run: |
+          mkdir -p output
+          ZIP_NAME="nikki_${{ matrix.arch }}-${{ matrix.branch }}.zip"
+          PACKAGE_DIR="bin/packages/${{ matrix.arch }}/nikki"
+          if [ -d "$PACKAGE_DIR" ]; then
+            cd "$PACKAGE_DIR"
+            zip -r "../../../../output/$ZIP_NAME" ./*
+            cd -
+          else
+            echo "No package directory found at $PACKAGE_DIR"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nikki_${{ matrix.arch }}-${{ matrix.branch }}
+          path: output/*.zip
+
+      - name: Send ZIP to Telegram
+        if: success()
+        run: |
+          ZIP_FILE="output/nikki_${{ matrix.arch }}-${{ matrix.branch }}.zip"
+          if [ -f "$ZIP_FILE" ]; then
+            curl -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+                 -F document=@$ZIP_FILE \
+                 -F caption="✅ Build selesai: ${{ matrix.arch }} - ${{ matrix.branch }}" \
+                 https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument
+          else
+            echo "ZIP not found: $ZIP_FILE"
+          fi
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: success()
+        with:
+          tag_name: "nikki-${{ matrix.arch }}-${{ matrix.branch }}"
+          name: "Release ${{ matrix.arch }} - ${{ matrix.branch }}"
+          body: |
+            Build otomatis untuk:
+            • Arch: ${{ matrix.arch }}
+            • Branch: ${{ matrix.branch }}
+          files: |
+            output/nikki_${{ matrix.arch }}-${{ matrix.branch }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
