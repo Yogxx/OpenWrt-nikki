@@ -1,0 +1,106 @@
+name: build-nikki
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.arch }}-${{ matrix.branch }} build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - aarch64_generic
+          - x86_64
+        branch:
+          - openwrt-23.05
+          - openwrt-24.10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from Makefile
+        id: getver
+        run: |
+          VERSION=$(grep -Po '(?<=PKG_VERSION:=).*' luci-app-nikki/Makefile)
+          RELEASE=$(grep -Po '(?<=PKG_RELEASE:=).*' luci-app-nikki/Makefile || echo "")
+          if [ -n "$RELEASE" ]; then
+            FULLVER="${VERSION}-${RELEASE}"
+          else
+            FULLVER="${VERSION}"
+          fi
+          echo "version=$FULLVER" >> $GITHUB_OUTPUT
+
+      - name: Build
+        uses: openwrt/gh-action-sdk@main
+        env:
+          ARCH: ${{ matrix.arch }}-${{ matrix.branch }}
+          FEEDNAME: nikki
+          PACKAGES: luci-app-nikki
+          NO_REFRESH_CHECK: true
+
+      - name: Create ZIP
+        run: |
+          mkdir -p output
+          ZIP_NAME="nikki_${{ matrix.arch }}-${{ matrix.branch }}.zip"
+          PACKAGE_DIR="bin/packages/${{ matrix.arch }}/nikki"
+          if [ -d "$PACKAGE_DIR" ]; then
+            cd "$PACKAGE_DIR"
+            zip -r "../../../../output/$ZIP_NAME" ./*
+            cd -
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nikki-${{ matrix.arch }}-${{ matrix.branch }}
+          path: output/*.zip
+
+      - name: Send ZIP to Telegram
+        if: success()
+        run: |
+          ZIP_FILE="output/nikki_${{ matrix.arch }}-${{ matrix.branch }}.zip"
+          if [ -f "$ZIP_FILE" ]; then
+            curl -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+                 -F document=@$ZIP_FILE \
+                 -F caption="✅ Build selesai: ${{ matrix.arch }} - ${{ matrix.branch }}" \
+                 https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument
+          fi
+
+  release:
+    name: Create unified Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all_zips
+
+      - name: Extract version again
+        id: getver
+        run: |
+          VERSION=$(grep -Po '(?<=PKG_VERSION:=).*' luci-app-nikki/Makefile)
+          RELEASE=$(grep -Po '(?<=PKG_RELEASE:=).*' luci-app-nikki/Makefile || echo "")
+          if [ -n "$RELEASE" ]; then
+            FULLVER="${VERSION}-${RELEASE}"
+          else
+            FULLVER="${VERSION}"
+          fi
+          echo "version=$FULLVER" >> $GITHUB_OUTPUT
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "nikki-${{ steps.getver.outputs.version }}"
+          name: "Nikki Release v${{ steps.getver.outputs.version }}"
+          body: |
+            Rilis otomatis berdasarkan versi Makefile:
+            • Versi: ${{ steps.getver.outputs.version }}
+          files: all_zips/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
