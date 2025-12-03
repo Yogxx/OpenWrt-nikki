@@ -10,7 +10,7 @@
         }
     },
     "admin/services/nikki/config": {
-        "title": "Status",
+        "title": "Apps",
         "order": 10,
         "action": {
             "type": "view",
